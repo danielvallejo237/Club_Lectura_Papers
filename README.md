@@ -6,4 +6,4 @@
 ## Categorías:
     
 ### Visión computacional:
-    1. [Towards Solving The DeepFake Problem] ( https://arxiv.org/abs/2102.09603 )
+    1. [Towards Solving The DeepFake Problem] (https://arxiv.org/abs/2102.09603)
