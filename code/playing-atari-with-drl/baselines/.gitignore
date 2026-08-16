@@ -2,3 +2,4 @@
 *.pt
 *.pth
 *.gif
+!cartpole_seed42/model.pt
