@@ -1,0 +1,16 @@
+# python>=3.10
+gymnasium[classic-control]>=1.0.0
+numpy>=1.24.0
+pandas>=2.0.0
+matplotlib>=3.7.0
+pyyaml>=6.0
+tqdm>=4.65.0
+imageio>=2.31.0
+imageio-ffmpeg>=0.4.9
+pygame>=2.5.0
+
+# PyTorch: install separately (matches your CUDA driver).
+# GPU (CUDA 12.x, e.g. driver CUDA 12.5):
+#   pip install torch --index-url https://download.pytorch.org/whl/cu124
+# CPU only:
+#   pip install torch --index-url https://download.pytorch.org/whl/cpu

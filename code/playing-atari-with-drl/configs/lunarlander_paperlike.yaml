@@ -1,0 +1,36 @@
+env_id: LunarLander-v3
+seed: 42
+total_steps: 100000
+
+network:
+  type: mlp
+  hidden_sizes: [128, 128]
+  activation: relu
+
+optimizer:
+  type: rmsprop
+  lr: 0.00025
+
+loss:
+  type: mse
+
+rl:
+  gamma: 0.99
+  batch_size: 64
+  replay_capacity: 50000
+  learning_starts: 1000
+  train_frequency: 1
+  epsilon_start: 1.0
+  epsilon_end: 0.05
+  epsilon_decay_steps: 50000
+  target_network: false
+  target_update_steps: 1000
+
+eval:
+  eval_every_steps: 5000
+  eval_episodes: 10
+  greedy: true
+
+logging:
+  save_every_steps: 10000
+  output_dir: outputs/lunarlander_paperlike

@@ -1,0 +1,4 @@
+# Experiment outputs are local-only; keep the folder in git via .gitkeep
+*
+!.gitignore
+!.gitkeep
