@@ -1,13 +1,10 @@
 # Frozen baselines
 
-Reference weights for watch-without-train and regression checks.
+Committed reference weights (seed 42). Do not overwrite when experimenting — train into `outputs/` instead.
 
-| Path | Seed | Config |
-|------|------|--------|
-| `cartpole_seed42/` | 42 | `configs/cartpole_paperlike.yaml` |
+| Path | Env | Config |
+|------|-----|--------|
+| `cartpole_seed42/` | CartPole | `configs/cartpole_paperlike.yaml` |
+| `lunarlander_seed42/` | LunarLander | `configs/lunarlander_baseline.yaml` |
 
-Do not overwrite these files when experimenting. Reproduce with:
-
-```bash
-python train.py --config configs/cartpole_paperlike.yaml --seed 42 --overwrite
-```
+Each folder has `model.pt`, `config.yaml`, and `RESULTS.md`.

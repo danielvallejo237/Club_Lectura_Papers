@@ -3,3 +3,4 @@
 *.pth
 *.gif
 !cartpole_seed42/model.pt
+!lunarlander_seed42/model.pt

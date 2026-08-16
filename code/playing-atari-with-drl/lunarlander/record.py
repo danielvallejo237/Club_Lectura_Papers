@@ -1,7 +1,6 @@
-"""Record CartPole episodes as GIF (single episode or NxN grid).
+"""Record LunarLander episodes as GIF (single episode or NxN grid).
 
-Uses the same render size as ``configs/cartpole_paperlike.yaml`` (physics unchanged).
-Grid cells are downscaled uniformly for RAM; see ``scripts/lab_gif.py``.
+Grid cells are downscaled uniformly; see ``scripts/lab_gif.py``.
 """
 
 from __future__ import annotations
@@ -14,7 +13,6 @@ import imageio.v2 as imageio
 import numpy as np
 import torch
 
-from cartpole.env import make_env
 from dqn.agent import DQNAgent
 from scripts.lab_gif import (
     GRID_CELL_WIDTH,
@@ -24,6 +22,7 @@ from scripts.lab_gif import (
     shrink_frame,
     stream_grid_gif,
 )
+from lunarlander.env import make_env
 
 
 def _load_config(path: str | Path) -> dict:
@@ -45,11 +44,11 @@ def _flatten_obs(obs: np.ndarray) -> np.ndarray:
     return np.asarray(obs, dtype=np.float32).flatten()
 
 
-def _end_reason(terminated: bool, truncated: bool) -> str:
+def _end_reason(terminated: bool, truncated: bool, score: float) -> str:
     if terminated:
-        return "fell"
+        return "landed" if score >= 100 else "crash"
     if truncated:
-        return "cap"
+        return "timeout"
     return "done"
 
 
@@ -60,7 +59,6 @@ def record_episode(
     seed: int | None = None,
     frame_stride: int = 1,
 ) -> tuple[list[np.ndarray], float, int, str]:
-    """Run one episode; return frames, score, step count, and end reason."""
     frames: list[np.ndarray] = []
     if seed is not None:
         obs, _ = env.reset(seed=seed)
@@ -85,7 +83,8 @@ def record_episode(
                 frames.append(shrink_frame(frame, GRID_CELL_WIDTH))
         if terminated or truncated:
             break
-    return frames, total_reward, steps, _end_reason(terminated, truncated)
+    end = _end_reason(terminated, truncated, total_reward)
+    return frames, total_reward, steps, end
 
 
 def save_frames(frames: list[np.ndarray], path: Path, fps: int = 30) -> Path:
@@ -151,7 +150,7 @@ def record(
     if output is None:
         out_dir = Path("outputs") / "recordings"
         out_dir.mkdir(parents=True, exist_ok=True)
-        output = str(out_dir / f"cartpole_{mode}.gif")
+        output = str(out_dir / f"lunar_{mode}.gif")
 
     gif_path = save_frames(frames, Path(output))
     print(f"saved: {gif_path} (seed={seed} score={score:.0f} steps={steps} end={end})")
@@ -165,9 +164,8 @@ def record_grid(
     checkpoint: str | None = None,
     seed_start: int = 42,
     output: str | None = None,
-    max_steps: int = 500,
+    max_steps: int = 400,
 ) -> Path:
-    """Record grid_size x grid_size episodes with consecutive seeds."""
     config, agent = _load_agent(mode, config_path, checkpoint, seed_start)
     env_probe = make_env(config, render_mode="rgb_array")
     n_actions = int(env_probe.action_space.n)
@@ -206,7 +204,7 @@ def record_grid(
     if output is None:
         out_dir = Path("outputs") / "recordings"
         out_dir.mkdir(parents=True, exist_ok=True)
-        output = str(out_dir / f"cartpole_{mode}_grid{grid_size}.gif")
+        output = str(out_dir / f"lunar_{mode}_grid{grid_size}.gif")
 
     labeled = prepare_labeled_episodes(episodes)
     del episodes
@@ -217,7 +215,7 @@ def record_grid(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Record CartPole episode or grid as GIF.")
+    parser = argparse.ArgumentParser(description="Record LunarLander episode or grid as GIF.")
     parser.add_argument("--mode", choices=["random", "untrained", "checkpoint"], default="checkpoint")
     parser.add_argument("--config", default=None)
     parser.add_argument("--checkpoint", default=None)
@@ -235,7 +233,7 @@ def main() -> None:
             checkpoint=args.checkpoint,
             seed_start=args.seed_start,
             output=args.output,
-            max_steps=min(args.max_steps, 500) if args.max_steps == 1000 else args.max_steps,
+            max_steps=min(args.max_steps, 400) if args.max_steps == 1000 else args.max_steps,
         )
     else:
         record(

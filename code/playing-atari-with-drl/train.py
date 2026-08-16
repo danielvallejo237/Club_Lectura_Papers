@@ -1,4 +1,14 @@
-"""Training loop for DQN."""
+"""Train DQN from a YAML config.
+
+Entry point: ``python train.py --config configs/<game>_*.yaml --seed 42 --overwrite``
+
+The loop collects transitions, fills replay, runs ε-greedy actions, periodically
+evaluates with a greedy policy, and writes CSV metrics + plots under
+``outputs/<output_dir>/seed_<N>/``.
+
+Game choice is only the config file (``env_id`` in YAML). ``envs.py`` and
+``cartpole/`` / ``lunarlander/`` are wired automatically — no edits needed there.
+"""
 
 from __future__ import annotations
 
@@ -13,7 +23,7 @@ import torch
 import yaml
 from tqdm import tqdm
 
-from cartpole.env import make_env
+from envs import is_lunarlander_config, make_env_from_config
 from dqn.agent import DQNAgent, _pick_device
 from dqn.policy import linear_schedule
 
@@ -21,6 +31,7 @@ ROOT = Path(__file__).resolve().parent
 
 
 def load_config(path: str | Path) -> dict:
+    """Load a lab YAML config."""
     with open(path, encoding="utf-8") as f:
         return yaml.safe_load(f)
 
@@ -33,6 +44,7 @@ def save_config(config: dict, path: str | Path) -> None:
 
 
 def run_dir(output_dir: str, seed: int) -> Path:
+    """Directory for one training run: ``outputs/<output_dir>/seed_<seed>/``."""
     return ROOT / output_dir / f"seed_{seed}"
 
 
@@ -54,6 +66,8 @@ def seed_env(env, seed: int) -> None:
 
 
 class MetricsLogger:
+    """Append-only CSV logger for per-episode and eval metrics."""
+
     def __init__(self, run_dir: Path) -> None:
         self.run_dir = Path(run_dir)
         self.run_dir.mkdir(parents=True, exist_ok=True)
@@ -80,6 +94,7 @@ class MetricsLogger:
 
 
 def save_all_plots(run_dir: Path) -> None:
+    """Write reward, loss, and eval PNGs from CSVs in ``run_dir``."""
     plot_dir = Path(run_dir) / "plots"
     plot_dir.mkdir(parents=True, exist_ok=True)
     metrics_path = Path(run_dir) / "metrics.csv"
@@ -125,7 +140,8 @@ def _flatten_obs(obs: np.ndarray) -> np.ndarray:
 
 
 def evaluate_agent(agent: DQNAgent, config: dict, n_episodes: int, seed: int) -> dict[str, float]:
-    env = make_env(config)
+    """Greedy rollouts for mid-training eval (same policy as ``evaluate.py``)."""
+    env = make_env_from_config(config)
     seed_env(env, seed)
     returns: list[float] = []
     for ep in range(n_episodes):
@@ -150,6 +166,7 @@ def evaluate_agent(agent: DQNAgent, config: dict, n_episodes: int, seed: int) ->
 
 
 def train(config_path: str, seed: int | None = None, overwrite: bool = False) -> Path:
+    """Run full DQN training; return path to ``outputs/.../seed_<N>/``."""
     config = load_config(config_path)
     if seed is not None:
         config["seed"] = seed
@@ -163,12 +180,14 @@ def train(config_path: str, seed: int | None = None, overwrite: bool = False) ->
     save_config(config, out / "config.yaml")
 
     set_seed(seed)
-    env = make_env(config)
+    env = make_env_from_config(config)
     seed_env(env, seed)
 
     print(f"device: {_pick_device()}")
-    if config.get("env"):
+    if config.get("env") and not is_lunarlander_config(config):
         print(f"env physics: {config['env']}")
+    elif is_lunarlander_config(config):
+        print(f"env: LunarLander ({config.get('env_id', 'LunarLander-v3')})")
 
     agent = DQNAgent(config, env.observation_space, env.action_space)
     agent.save_checkpoint(str(out / "model_initial.pt"), step=0)
@@ -229,10 +248,12 @@ def train(config_path: str, seed: int | None = None, overwrite: bool = False) ->
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Train DQN from a YAML config.")
-    parser.add_argument("--config", required=True)
-    parser.add_argument("--seed", type=int, default=None)
-    parser.add_argument("--overwrite", action="store_true")
+    parser = argparse.ArgumentParser(
+        description="Train DQN. Pick game via --config (cartpole_paperlike or lunarlander_baseline)."
+    )
+    parser.add_argument("--config", required=True, help="YAML config path")
+    parser.add_argument("--seed", type=int, default=None, help="override config seed")
+    parser.add_argument("--overwrite", action="store_true", help="replace existing run directory")
     args = parser.parse_args()
     train(args.config, seed=args.seed, overwrite=args.overwrite)
 

@@ -1,137 +1,139 @@
-# Playing Atari with Deep RL — CartPole DQN Lab
+# Playing Atari with Deep RL — DQN Lab
 
-The [DeepMind DQN paper](https://arxiv.org/pdf/1312.5602) (`playing-atari-with-drl.pdf` in this folder) learns to play Atari games from pixels using a convolutional Q-network, experience replay, and ε-greedy exploration. Atari runs are heavy (GPU time, long training, image preprocessing).
+The [DeepMind DQN paper](https://arxiv.org/pdf/1312.5602) (`playing-atari-with-drl.pdf` in this folder) learns Atari from pixels with a CNN, replay memory, and ε-greedy exploration. This repo is a **vector-MLP lab** on the same algorithm family — pick a game via config, edit `dqn/` for quests.
 
-This repo is a **small, readable lab** on the same algorithm family: **DQN on CartPole** — a cart with a pole that must stay upright. State is four numbers (cart position, velocity, pole angle, angular velocity), not screen pixels. Training finishes in minutes on CPU. The code mirrors the paper’s ingredients (replay buffer, MLP Q-network, RMSProp, ε-decay) so changes map back to the Atari setup.
+| Game | Difficulty | Baseline config | Weights |
+|------|------------|-----------------|---------|
+| **CartPole** | Easy (~2 min GPU) | `configs/cartpole_paperlike.yaml` | `baselines/cartpole_seed42/model.pt` |
+| **LunarLander** | Harder (~30–60 min GPU) | `configs/lunarlander_baseline.yaml` | `baselines/lunarlander_seed42/model.pt` |
+
+**CartPole** trains quickly and curves are stable — good for smoke tests. **LunarLander** takes longer and learning is noisier (landings vs crashes vary a lot), but quest changes show up more clearly. Same code path for both; only the YAML changes.
+
+---
+
+## Untrained vs trained (3×3 grids)
+
+Each cell is one **greedy** episode. Overlays: `seed=`, `score=`, `steps=`, `end=` (`fell` / `cap` / `landed` / `crash` / `timeout`).
+
+<table>
+  <tr>
+    <th></th>
+    <th align="center">Untrained</th>
+    <th align="center">Trained baseline</th>
+  </tr>
+  <tr>
+    <th align="center">CartPole<br/><em>easy</em></th>
+    <td align="center"><img src="assets/cartpole_untrained_grid.gif" alt="CartPole untrained grid" width="420"/></td>
+    <td align="center"><img src="assets/cartpole_trained_grid.gif" alt="CartPole trained grid" width="420"/></td>
+  </tr>
+  <tr>
+    <th align="center">LunarLander<br/><em>harder</em></th>
+    <td align="center"><img src="assets/lunarlander_untrained_grid.gif" alt="LunarLander untrained grid" width="420"/></td>
+    <td align="center"><img src="assets/lunarlander_trained_grid.gif" alt="LunarLander trained grid" width="420"/></td>
+  </tr>
+</table>
+
+Regenerate locally (CPU keeps RAM down on small VMs):
+
+```bash
+export CUDA_VISIBLE_DEVICES=""
+python -m cartpole.record --mode untrained --config configs/cartpole_paperlike.yaml --grid 3 --output assets/cartpole_untrained_grid.gif
+python -m cartpole.record --mode checkpoint --checkpoint baselines/cartpole_seed42/model.pt --grid 3 --output assets/cartpole_trained_grid.gif
+python -m lunarlander.record --mode untrained --config configs/lunarlander_baseline.yaml --grid 3 --output assets/lunarlander_untrained_grid.gif
+python -m lunarlander.record --mode checkpoint --checkpoint baselines/lunarlander_seed42/model.pt --grid 3 --output assets/lunarlander_trained_grid.gif
+```
 
 ---
 
 ## CartPole in one minute
 
-A cart moves on a track. A pole is hinged on the cart. Each timestep you push **left** or **right**. The episode ends when the pole falls past an angle limit or the cart leaves the track.
+A cart on a track; a pole hinged on top. Each step: push **left** or **right**. Episode ends if the pole falls or the cart leaves the track.
 
-**Score:** reward is **+1 per timestep** the pole stays up. The on-screen score is **how many steps survived** (not cumulative reward from other sources). Roughly **0.02 s per step**, so score 500 ≈ 10 s of balance. Training episodes truncate at **500 steps** (CartPole-v1 style); a fall ends the episode earlier.
+**Score:** +1 per timestep upright → **steps survived** (500 steps ≈ 10 s). **Solved:** greedy score **500/500** (training cap).
 
-**Human play:** [CartPole in the browser](https://jeffjar.me/cartpole.html) (arrow keys or h/l) uses similar wide physics so you can feel the task before touching code.
-
-### Untrained vs trained
-
-Left: a **fresh Q-network** (random weights, greedy actions) — falls quickly. Right: the **seed-42 baseline** after ~50k training steps — holds the pole.
-
-<table>
-  <tr>
-    <th align="center">Untrained (random weights)</th>
-    <th align="center">Trained baseline (seed 42)</th>
-  </tr>
-  <tr>
-    <td align="center"><img src="assets/untrained.gif" alt="Untrained CartPole agent" width="420"/></td>
-    <td align="center"><img src="assets/trained.gif" alt="Trained CartPole baseline" width="420"/></td>
-  </tr>
-</table>
-
-Record your own clips: `python -m cartpole.record --mode untrained` or `--mode checkpoint --checkpoint baselines/cartpole_seed42/model.pt`.
+**Try it:** [CartPole in the browser](https://jeffjar.me/cartpole.html) · local: `python -m cartpole.play`
 
 ---
 
-## Pre-trained baseline
+## LunarLander in one minute
 
-A reference run is stored so notebooks and eval work without retraining:
+Land a craft on a pad between flags. Discrete actions: **noop**, **left engine**, **main engine**, **right engine** (same stack as Gymnasium `LunarLander-v3`).
 
-| Item | Value |
-|------|-------|
-| **Weights** | `baselines/cartpole_seed42/model.pt` |
-| **Config** | `configs/cartpole_paperlike.yaml`, seed **42** |
-| **Size** | ~72 KB (small MLP: 128→128 hidden units) |
-| **Timed eval** | mean return **500 / 500** steps (20 episodes, greedy) |
+**Score:** shaped landing reward (fuel, speed, legs, pad contact). High variance — one seed lands, the next crashes. **Solved:** mean greedy return **≥ 200** over many episodes. Needs `gymnasium[box2d]`.
 
-Copy for local experiments: `checkpoints/cartpole_baseline/`. Reproduce from scratch:
-
-```bash
-python train.py --config configs/cartpole_paperlike.yaml --seed 42 --overwrite
-```
-
-Details and gate checks: `baselines/cartpole_seed42/RESULTS.md`.
-
----
-
-## What you can do here
-
-| Activity | What it means |
-|----------|----------------|
-| **Play** | Browser or `python -m cartpole.play` — learn the physics by hand. |
-| **Watch** | Short **GIF recordings** of random, untrained, or checkpoint agents (`notebooks/01_watch.ipynb` or `cartpole.record`). “Watch” = see the cart move step-by-step, not read loss curves. |
-| **Train** | Run DQN from config; metrics and plots land in `outputs/`. |
-| **Quests** | Optional one-change experiments (below) — edit a single part of `dqn/`, retrain, compare curves. |
-
-Colab-first: open the notebooks with minimal local setup. Local install: `bash scripts/setup.sh`.
+**Try it:** [Lunar Lander in the browser](http://moonlander.seb.ly/) · local: `python -m lunarlander.play`
 
 ---
 
 ## Start here
 
-| Step | Why | Action |
-|------|-----|--------|
-| 1 | Know what “balancing” feels like | [CartPole in the browser](https://jeffjar.me/cartpole.html) |
-| 2 | See failure vs success on video | `notebooks/01_watch.ipynb` — records GIFs (random / untrained / baseline) |
-| 3 | Run or reproduce training | `notebooks/02_train.ipynb` or `python train.py --config configs/cartpole_paperlike.yaml --seed 42` |
-| 4 | Change one DQN piece | Pick a quest below → `notebooks/03_quest.ipynb` |
+```bash
+bash scripts/setup.sh && source .venv/bin/activate
+```
 
-The DQN agent only uses **left / right** thrust. Local human play can **coast** when no key is held; the learned policy does not use a coast action.
+| Step | Action |
+|------|--------|
+| 1 | `notebooks/01_watch.ipynb` — set `GAME` to `cartpole` or `lunarlander` |
+| 2 | `notebooks/02_train.ipynb` — same `GAME`, reproduce a baseline |
+| 3 | Pick a quest → `notebooks/03_quest.ipynb` |
+
+Use **CartPole** for a quick pass; use **LunarLander** when you want quest effects to move the learning curve.
+
+---
+
+## Baselines (seed 42)
+
+Frozen weights in `baselines/` — do not overwrite when experimenting (train into `outputs/` instead).
+
+| Game | Eval highlight | Details |
+|------|----------------|---------|
+| CartPole | mean **500/500** steps (20 ep, greedy) | `baselines/cartpole_seed42/RESULTS.md` |
+| LunarLander | mean **~208** (100 ep, greedy; solved ≥ 200) | `baselines/lunarlander_seed42/RESULTS.md` |
+
+```bash
+python train.py --config configs/cartpole_paperlike.yaml --seed 42 --overwrite
+python train.py --config configs/lunarlander_baseline.yaml --seed 42 --overwrite
+
+python evaluate.py --checkpoint baselines/cartpole_seed42/model.pt --episodes 20 --seed 42
+python evaluate.py --checkpoint baselines/lunarlander_seed42/model.pt --episodes 100 --seed 42
+```
 
 ---
 
 ## Quests
 
-**Quests** are guided tweaks: change **one** baseline component (ε schedule, replay size, target network, etc.), keep the rest fixed, and compare `outputs/<experiment>/seed_<N>/plots/` and `metrics.csv` to the baseline.
+Change **one** thing in `dqn/` or config, retrain, compare `outputs/.../plots/` to the baseline.
 
-| # | Quest | What it explores | Objective |
-|---|-------|------------------|-----------|
-| 1 | [Epsilon schedule](quests/01_change_epsilon_schedule.md) | Exploration rate ε during training | See how faster or slower ε decay affects learning speed and final score |
-| 2 | [Replay memory](quests/02_change_replay_memory.md) | Experience replay capacity | Compare small vs large buffer; observe sample diversity and stability |
-| 3 | [Target network](quests/03_add_target_network.md) | Fixed bootstrap target for Q-learning | Add or tune a target net; compare stability to the no-target baseline |
-| 4 | [Compare optimizers](quests/04_compare_optimizers.md) | RMSProp vs Adam | Same network and replay; isolate optimizer effects on the learning curve |
-| 5 | [Try LunarLander](quests/05_try_lunarlander.md) | Same DQN stack, harder environment | Apply the lab to discrete LunarLander with a new config |
-| 6 | [Network architecture](quests/06_change_network_architecture.md) | Hidden size and activation | Test capacity vs training speed (wider/deeper MLP) |
-| 7 | [Pixel CartPole + CNN](quests/07_pixel_cartpole_cnn.md) | Image observations + conv net | Move toward the pixel-based Atari setup in the paper |
+Quests run on **either** game via the config / notebook `GAME` switch. **CartPole** trains faster and is usually easier / more stable — good for a quick pass. **LunarLander** takes longer and curves are messier / less stable, but differences from a quest often show up more clearly.
 
-Edit files under `dqn/` for most quests; `cartpole/` stays fixed so env physics match the baseline.
+| # | Quest | Effort |
+|---|-------|--------|
+| 1 | [ε-greedy annealing](quests/01_change_epsilon_schedule.md) | easy |
+| 2 | [Experience replay](quests/02_change_replay_memory.md) | easy–med |
+| 3 | [Target network (2013 vs Nature)](quests/03_add_target_network.md) | easy |
+| 4 | [RMSProp vs Adam](quests/04_compare_optimizers.md) | easy |
+| 5 | [MSE vs Huber loss](quests/05_mse_vs_huber.md) | easy |
+| 6 | [Double DQN](quests/06_double_dqn.md) | medium |
+| 7 | [Discount $\gamma$ (return)](quests/07_discount_gamma.md) | easy |
+
+Edit `dqn/` for quests. Ignore `cartpole/`, `lunarlander/`, `envs.py`, and `scripts/` unless debugging plumbing or tooling.
 
 ---
 
 ## Layout
 
 ```text
-dqn/        ← Q-network, replay, loss, policy, agent (quest edits go here)
-cartpole/   ← environment, GIF recording, local pygame play
-train.py    ← training loop, metrics CSV, plots
-evaluate.py ← greedy / ε-greedy evaluation
-configs/    ← hyperparameters (cartpole_paperlike.yaml = baseline)
-notebooks/  ← 01 watch, 02 train, 03 quest (Colab entry points)
-quests/     ← per-quest instructions (linked above)
-baselines/  ← frozen seed-42 weights + RESULTS
-assets/     ← README comparison GIFs
-outputs/    ← local training runs (gitignored)
-```
-
----
-
-## Commands
-
-```bash
-# setup (local)
-bash scripts/setup.sh && source .venv/bin/activate
-
-# train baseline (reproduce seed 42)
-python train.py --config configs/cartpole_paperlike.yaml --seed 42 --overwrite
-
-# evaluate timed episodes (500-step cap)
-python evaluate.py --checkpoint baselines/cartpole_seed42/model.pt --episodes 20 --seed 42
-
-# record GIF from checkpoint
-python -m cartpole.record --mode checkpoint --checkpoint baselines/cartpole_seed42/model.pt
-
-# local play (display required)
-python -m cartpole.play
+train.py / evaluate.py   entry points
+envs.py                  routes config env_id → cartpole or lunarlander
+dqn/                     algorithm (quest edits)
+configs/                 cartpole_paperlike + lunarlander_baseline
+baselines/               frozen weights + RESULTS
+assets/                  grid GIFs above
+notebooks/               01 watch · 02 train · 03 quest
+quests/                  experiment guides
+cartpole/ lunarlander/   env + record + play
+scripts/                 setup.sh + lab_gif.py (GIF tooling)
+outputs/                 your runs (gitignored; created on train)
 ```
 
 ---
@@ -144,4 +146,4 @@ REPO_URL = "https://github.com/danielvallejo237/Club_Lectura_Papers.git"
 !pip install -q -r requirements.txt
 ```
 
-Open `notebooks/01_watch.ipynb`. Save a copy to Drive before editing.
+Open `notebooks/01_watch.ipynb`. Save a copy before editing.

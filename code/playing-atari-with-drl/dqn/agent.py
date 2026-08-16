@@ -1,4 +1,8 @@
-"""DQN agent: action selection and one gradient update."""
+"""DQN agent: ε-greedy actions, replay, and TD updates.
+
+Quests typically flip config (ε, replay, target, loss, optimizer) or enable
+``rl.double_dqn``. Optimizer / loss come from YAML.
+"""
 
 from __future__ import annotations
 
@@ -40,6 +44,10 @@ class DQNAgent:
         self.batch_size = int(self.rl["batch_size"])
         self.use_target = bool(self.rl.get("target_network", False))
         self.target_update_steps = int(self.rl.get("target_update_steps", 1000))
+        # Double DQN: select a' with online Q, evaluate with target (needs target_network).
+        self.double_dqn = bool(self.rl.get("double_dqn", False))
+        if self.double_dqn and not self.use_target:
+            raise ValueError("rl.double_dqn=true requires rl.target_network=true")
 
         self.device = device or _pick_device()
         self.n_actions = int(action_space.n)
@@ -91,7 +99,12 @@ class DQNAgent:
         q_values = self.q_network(states)
         with torch.no_grad():
             target_net = self.target_network if self.use_target else self.q_network
-            next_q = target_net(next_states).max(dim=1).values
+            if self.double_dqn:
+                # argmax from online Q; value from target network (Double DQN).
+                next_actions = self.q_network(next_states).argmax(dim=1)
+                next_q = target_net(next_states).gather(1, next_actions.unsqueeze(1)).squeeze(1)
+            else:
+                next_q = target_net(next_states).max(dim=1).values
             targets = rewards + self.gamma * next_q * (1.0 - dones)
 
         loss = compute_td_loss(q_values, actions, targets, self.loss_type)

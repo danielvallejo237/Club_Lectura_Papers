@@ -2,10 +2,11 @@
 __pycache__/
 *.py[cod]
 
-# Local smoke tests (not part of the shared lab)
+# Created by train.py / record.py — not shipped
+outputs/
+
+# Local smoke tests (not part of the lab)
 tests/
 
-# Local experiment outputs (folder kept via outputs/.gitkeep)
-outputs/**
-!outputs/.gitignore
-!outputs/.gitkeep
+# Quest notebook config copies
+configs/quest_*.yaml

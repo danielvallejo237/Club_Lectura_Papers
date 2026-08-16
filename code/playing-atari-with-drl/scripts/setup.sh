@@ -53,4 +53,5 @@ fi
 echo ""
 echo "Setup complete."
 echo "  source .venv/bin/activate"
+echo "  python train.py --config configs/cartpole_paperlike.yaml --seed 42 --overwrite"
 echo "  python -m cartpole.play"

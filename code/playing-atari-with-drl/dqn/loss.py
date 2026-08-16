@@ -12,10 +12,10 @@ def compute_td_loss(
     targets: torch.Tensor,
     loss_type: str = "mse",
 ) -> torch.Tensor:
-    """
-    Compute loss between Q(s, a) and Bellman targets for taken actions.
+    """Loss between Q(s, a) and Bellman targets (terminals already masked in targets).
 
-    Targets should already mask bootstrap at terminal states (reward only when done).
+    ``mse`` matches the 2013 DQN squared TD error; ``huber`` matches Nature-style
+    clipped TD error (smooth L1).
     """
     q_sa = q_values.gather(1, actions.unsqueeze(1)).squeeze(1)
     if loss_type == "huber":
