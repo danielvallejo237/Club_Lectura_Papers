@@ -1,0 +1,52 @@
+# LunarLander baseline (seed 42). Same DQN stack as CartPole; harder env.
+#
+# vs DeepMind DQN paper (Atari):
+#   paper: CNN + pixels, RMSProp, target net, Huber, reward clip
+#   this:  MLP on 8 floats, Adam (RMSProp underfit at 200k), target net on, MSE
+# Paperlike starting recipe that did not solve (≥200 mean):
+#   optimizer.type: rmsprop, lr: 0.00025
+#   network.hidden_sizes: [128, 128]
+#   total_steps: 200000, epsilon_end: 0.05, epsilon_decay_steps: 100000
+# To try paper loss: set loss.type: huber
+
+env_id: LunarLander-v3
+seed: 42
+total_steps: 300000
+
+env:
+  max_episode_steps: 1000
+
+network:
+  type: mlp
+  hidden_sizes: [256, 256]  # paper uses CNN; wider MLP needed vs CartPole 128×128
+  activation: relu
+
+optimizer:
+  type: adam  # paper: rmsprop — Adam was required to reach Gate R ≥200
+  lr: 0.0005
+
+loss:
+  type: mse
+
+rl:
+  gamma: 0.99
+  batch_size: 64
+  replay_capacity: 100000
+  learning_starts: 5000
+  train_frequency: 1
+  epsilon_start: 1.0
+  epsilon_end: 0.01  # paper often ends at 0.1
+  epsilon_decay_steps: 150000
+  target_network: true  # paper Nature-style; keep on for Lunar stability
+  target_update_steps: 1000
+  # Quest 6: set double_dqn: true (needs target_network)
+  double_dqn: false
+
+eval:
+  eval_every_steps: 10000
+  eval_episodes: 20
+  greedy: true
+
+logging:
+  save_every_steps: 50000
+  output_dir: outputs/lunarlander_baseline

@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+*.py[cod]
+
+# Created by train.py / record.py — not shipped
+outputs/
+
+# Local smoke tests (not part of the lab)
+tests/
+
+# Quest notebook config copies
+configs/quest_*.yaml

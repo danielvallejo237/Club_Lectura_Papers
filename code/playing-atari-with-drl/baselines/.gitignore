@@ -1,0 +1,6 @@
+# Local reference weights and recordings (reproduce via train.py --seed 42)
+*.pt
+*.pth
+*.gif
+!cartpole_seed42/model.pt
+!lunarlander_seed42/model.pt
